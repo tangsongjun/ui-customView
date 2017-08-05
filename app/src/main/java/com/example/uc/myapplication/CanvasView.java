@@ -115,7 +115,7 @@ public class CanvasView extends View {
                     //获得文字的高度
                     int textH = boundRect.bottom - boundRect.top;
                     int space = 10;
-                    //????
+                    //????int second = canvas.save(); 相当于canvas 还原到旋转前的状态，正常draw完Text后就再反向旋转就可以得到正向文字
                     canvas.translate(0, -radius + 35 + textH + space);
                     canvas.rotate(-i);
                     canvas.drawText(text, -(boundRect.right - boundRect.left) / 2 , boundRect.bottom, p);
