@@ -7,7 +7,10 @@ import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Rect;
 import android.graphics.RectF;
+import android.os.Handler;
+import android.os.Message;
 import android.util.AttributeSet;
+import android.util.Log;
 import android.util.TypedValue;
 import android.view.View;
 
@@ -79,8 +82,20 @@ public class CanvasView extends View {
 
     }
 
+    final int update = 1;
+    Handler mHandler = new Handler() {
+        @Override
+        public void handleMessage(Message msg) {
+            switch (msg.what) {
+                case update:
+                    postInvalidate();
+                    break;
+            }
+        }
+    };
+
+    int watchStokeWidth  = 15;
     private void drawWatch(Canvas canvas) {
-        int watchStokeWidth  = 15;
         Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
         paint.setColor(Color.RED);
         paint.setStyle(Paint.Style.STROKE);
@@ -88,7 +103,7 @@ public class CanvasView extends View {
         int first = canvas.save();
         float CenterX = canvas.getWidth() /2;
         float CenterY = canvas.getHeight() / 2;
-        float radius = 200;
+        int radius = 350;
 
 //        RectF ol = new RectF(CenterX - radius, CenterY - radius, CenterX + radius, CenterY + radius);
 //        canvas.drawArc(ol, 0, 360, false, paint);
@@ -109,18 +124,20 @@ public class CanvasView extends View {
                 String text = i/ 30 == 0 ? "12" : String.valueOf(i / 30);
                 float textW = p.measureText(text);
                 int second = canvas.save();
+                Rect boundRect = new Rect();
+                p.getTextBounds(text, 0, text.length(), boundRect);
+                int space = 0;
+                //获得文字的高度
+                int textH = boundRect.bottom - boundRect.top;
                 if (i != 0) {
-                    Rect boundRect = new Rect();
-                    p.getTextBounds(text, 0, text.length(), boundRect);
-                    //获得文字的高度
-                    int textH = boundRect.bottom - boundRect.top;
-                    int space = 10;
                     //????int second = canvas.save(); 相当于canvas 还原到旋转前的状态，正常draw完Text后就再反向旋转就可以得到正向文字
-                    canvas.translate(0, -radius + 35 + textH + space);
+                    float y = -radius + 35 + textH + space + watchStokeWidth / 2;
+                    canvas.translate(0, y);
                     canvas.rotate(-i);
                     canvas.drawText(text, -(boundRect.right - boundRect.left) / 2 , boundRect.bottom, p);
+                    Log.d("onDraw","i=" + i +" Y," + y + "right:" + boundRect.right +", left:" + boundRect.left + ", bottom= " + boundRect.bottom + ", H1=" + textH);
                 } else {
-                    canvas.drawText(text, - textW / 2 , - radius + watchStokeWidth/2 + 60, p);
+                    canvas.drawText(text, - textW / 2 , - radius + watchStokeWidth/2 + 35 + textH + space, p);
                 }
                 canvas.restore();
 
@@ -129,10 +146,69 @@ public class CanvasView extends View {
             }
             canvas.rotate(degree);
         }
+//        canvas.restore();
 
-        canvas.drawPoint(CenterX, CenterY, paint);
+//        int third = canvas.save();
+        paint.setStrokeWidth(10);
+        paint.setColor(Color.CYAN);
+        canvas.drawPoint(0, 0, paint);
 
         canvas.restore();
+
+        drawPointer(canvas, radius);
+    }
+
+    private void drawPointer(Canvas canvas, int radius) {
+        int space = (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 30, mResources.getDisplayMetrics());
+        canvas.save();
+        float CenterX = canvas.getWidth() /2;
+        float CenterY = canvas.getHeight() / 2;
+        canvas.translate(CenterX, CenterY);
+        Calendar calendar = Calendar.getInstance();
+        int hour = calendar.get(Calendar.HOUR);
+        int minute = calendar.get(Calendar.MINUTE);
+        int second = calendar.get(Calendar.SECOND);
+        float hAngle = hour * 360 / 12;
+        float mAngle = minute * 360 / 60;//每一分6度
+        float sAngle = second * 360 / 60;
+        hAngle += minute / 60.0 * 30;
+        mAngle += second / 60.0 * 6;
+
+        int y = (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 25, mResources.getDisplayMetrics());
+
+        //绘制时针
+        canvas.save();
+        Paint hP = new Paint(Paint.ANTI_ALIAS_FLAG);
+        hP.setColor(Color.LTGRAY);
+        hP.setStrokeWidth(12);
+        canvas.rotate(hAngle);
+        canvas.drawLine(0, y , 0, -radius + watchStokeWidth + space + 55, hP);
+        canvas.restore();
+
+        //绘制分钟
+
+        canvas.save();
+        Paint mP = new Paint(Paint.ANTI_ALIAS_FLAG);
+        mP.setColor(Color.WHITE);
+        mP.setStrokeWidth(9);
+        canvas.rotate(mAngle);
+        canvas.drawLine(0, y , 0, -radius + watchStokeWidth + space + 35, mP);
+        canvas.restore();
+
+        //绘制秒钟
+
+        canvas.save();
+        Paint sP = new Paint(Paint.ANTI_ALIAS_FLAG);
+        sP.setColor(Color.BLACK);
+        sP.setStrokeWidth(6);
+        canvas.rotate(sAngle);
+        canvas.drawLine(0, y ,  0, -radius + watchStokeWidth + space + 5, sP);
+        canvas.restore();
+
+        canvas.restore();
+
+        mHandler.sendEmptyMessageAtTime(update, 1000);
+
     }
 
     /**
@@ -260,6 +336,11 @@ public class CanvasView extends View {
 
     }
 
+    @Override
+    protected void onDetachedFromWindow() {
+        super.onDetachedFromWindow();
+        mHandler.removeMessages(update);
+    }
 
     private void initData() {
         mTotalWidth = mResources.getDisplayMetrics().widthPixels - 2 * mDividRuleLeftMargin;
